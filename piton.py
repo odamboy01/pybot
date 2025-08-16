@@ -1,22 +1,14 @@
 import asyncio
 import logging
-import os
-from datetime import datetime
-
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from config import TOKEN
 
-# --- Bot bootstrap ---
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- Storage for downloaded media ---
-SAVE_PATH = "downloads"
-os.makedirs(SAVE_PATH, exist_ok=True)
-
-# --- Number → description mapping (1..106) ---
+# Number → description mapping (all 106 ideas)
 RESPONSES = {
     1: "Weather app — A simple tool to check current weather and forecasts using an online API.",
     2: "To-do list — A basic application to manage tasks, allowing users to add, remove, and check off items.",
@@ -27,7 +19,7 @@ RESPONSES = {
     7: "Notes app — A simple application to take and manage notes, allowing users to create, edit, and delete notes.",
     8: "Expense tracker — An application to track daily expenses, allowing users to categorize and analyze their spending.",
     9: "Password generator — A tool to generate strong and secure passwords based on user-defined criteria.",
-    10: "Pomodoro timer — A productivity tool that uses the Pomodoro Technique to help users manage time effectively by breaking work into intervals.",
+    10: "Pomodoro timer — A productivity tool that uses the Pomodoro Technique to help users manage their time effectively by breaking work into intervals.",
     11: "Unit converter — An application to convert between different units of measurement, such as length, weight, and temperature.",
     12: "Markdown editor — A simple text editor that supports Markdown syntax for formatting text.",
     13: "Simple blog — A basic blogging platform where users can create, edit, and publish blog posts.",
@@ -126,8 +118,6 @@ RESPONSES = {
     106: "Simple suggestion bot — A suggestion collection bot."
 }
 
-# --- Commands & Handlers ---
-
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer("Assalomu alaykum\nNa gap?")
@@ -140,56 +130,44 @@ async def cmd_salom(message: Message):
 async def cmd_na_gap(message: Message):
     await message.reply("Valeykum Assalom!")
 
-# Save any photo to ./downloads with username + timestamp
 @dp.message(F.photo)
-async def photo_handler(message: Message):
-    photo = message.photo[-1]  # largest size
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    username = message.from_user.username or str(message.from_user.id)
-    filename = f"{username}_{photo.file_unique_id}_{timestamp}.jpg"
-    path = os.path.join(SAVE_PATH, filename)
+async def photo(message: Message):
+    if message.photo:
+        await message.answer(f"Foto ID si: {message.photo[-1].file_id}")
+    else:
+        await message.answer("Hech qanday foto topilmadi.")
 
-    await bot.download(photo, destination=path)
-    await message.answer(f"✅ Rasm saqlandi: {path}")
-
-# List all ideas (1..106)
+# Show list of all ideas (split into safe chunks)
 @dp.message(Command("idea"))
 async def cmd_idea(message: Message):
-    lines = []
-    # print in numeric order
-    for i in range(1, len(RESPONSES) + 1):
-        name = RESPONSES[i].split(" — ")[0]
-        lines.append(f"{i}. {name}")
-    await message.answer(
-        "100+ Simple Project Ideas:\n" + "\n".join(lines) + "\n\nSend /choose <number> to select an idea."
-    )
+    idea_lines = [f"{i}. {RESPONSES[i].split(' — ')[0]}" for i in RESPONSES]
+    text = "\n".join(idea_lines)
 
-# /choose NUMBER → same text as sending NUMBER
+    for i in range(0, len(text), 4000):  # split to avoid Telegram limit
+        await message.answer(text[i:i+4000])
+
+    await message.answer("\nSend /choose <number> to select an idea.")
+
+# Handle /choose NUMBER
 @dp.message(Command("choose"))
 async def cmd_choose(message: Message):
-    parts = message.text.split()
-    if len(parts) != 2 or not parts[1].isdigit():
+    args = message.text.split()
+    if len(args) != 2 or not args[1].isdigit():
         await message.reply("Usage: /choose <number>")
         return
-
-    num = int(parts[1])
-    text = RESPONSES.get(num)
-    if text:
-        await message.reply(text)
+    num = int(args[1])
+    if num in RESPONSES:
+        await message.reply(RESPONSES[num])
     else:
         await message.reply(f"Invalid number. Please choose between 1 and {len(RESPONSES)}.")
 
-# Plain number messages (e.g. "5")
+# Handle direct number messages
 @dp.message(F.text.regexp(r"^\d+$"))
 async def number_handler(message: Message):
     num = int(message.text)
-    text = RESPONSES.get(num)
-    if text:
-        await message.reply(text)
-    else:
-        await message.reply(f"Noto‘g‘ri raqam. 1..{len(RESPONSES)} orasidan tanlang.")
+    if num in RESPONSES:
+        await message.reply(RESPONSES[num])
 
-# --- Runner ---
 async def main():
     await dp.start_polling(bot)
 
@@ -198,4 +176,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nGoodbye")
+        print("\nGood
